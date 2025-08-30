@@ -1,3 +1,5 @@
+import os
+import json
 import logging
 import requests
 from telegram import Update, Bot
@@ -14,13 +16,30 @@ SHORTLINK_API = "a1cea9752ca22b304682220c274fa51e504b6e04"
 logging.basicConfig(level=logging.INFO)
 bot = Bot(BOT_TOKEN)
 
+DB_FILE = "movies.json"
+
+# --------- Load/Save JSON Database ----------
+def load_db():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_db(data):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# Initial load
+movie_cache = load_db()
+
 # -------- Shortlink Generator ----------
 def make_shortlink(url: str) -> str:
     try:
         api_url = f"https://shrinkme.io/api?api={SHORTLINK_API}&url={url}"
         r = requests.get(api_url).json()
-        return r["shortenedUrl"]
-    except:
+        return r.get("shortenedUrl", url)
+    except Exception as e:
+        logging.error(f"Shortlink error: {e}")
         return url
 
 # -------- Start Command ----------
@@ -30,21 +49,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- Handle Movie Search ----------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    user_id = update.message.from_user.id
 
-    # STEP 1: Check if movie already in PRIVATE CHANNEL
-    async for msg in bot.get_chat_history(PRIVATE_CHANNEL, limit=50):
-        if query.lower() in (msg.text or "").lower():
-            await update.message.reply_text("✅ Found in Database! Sending...")
-            await bot.forward_message(chat_id=PUBLIC_CHANNEL, from_chat_id=PRIVATE_CHANNEL, message_id=msg.message_id)
-            await bot.forward_message(chat_id=BACKUP_CHANNEL, from_chat_id=PRIVATE_CHANNEL, message_id=msg.message_id)
-            return
+    # STEP 1: Check if already in DB
+    if query.lower() in movie_cache:
+        movie_text = movie_cache[query.lower()]
+        await update.message.reply_text("✅ Found in Database! Sending...")
+        await bot.send_message(chat_id=PUBLIC_CHANNEL, text=movie_text)
+        await bot.send_message(chat_id=BACKUP_CHANNEL, text=movie_text)
+        return
 
     # STEP 2: Not Found → Generate shortlink + Save
-    fake_movie_url = f"https://example.com/{query.replace(' ', '_')}"  # Replace with real link grabber later
+    fake_movie_url = f"https://example.com/{query.replace(' ', '_')}"  # placeholder
     short_url = make_shortlink(fake_movie_url)
 
     movie_text = f"🎬 {query}\n🔗 Link: {short_url}"
+
+    # Save in DB
+    movie_cache[query.lower()] = movie_text
+    save_db(movie_cache)
 
     # Upload to Private DB
     msg = await bot.send_message(chat_id=PRIVATE_CHANNEL, text=movie_text, parse_mode="Markdown")
@@ -65,7 +87,6 @@ def main():
     print("🤖 Bot is running...")
     app.run_polling()
 
-
 if __name__ == "__main__":
     main()
-    
+
