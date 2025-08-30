@@ -6,7 +6,7 @@ from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ---------------- CONFIG ----------------
-BOT_TOKEN = "8406310603:AAE3pDq0mFnuI5xT1KLFvbcFUhr-LGwCan8"
+BOT_TOKEN = "8406310603:AAF6eSzyj3ZJL7vBLTDTgYn0EkseWM0Vc_s"
 PUBLIC_CHANNEL = -1002662162108
 GROUP_ID = -1002261063910
 PRIVATE_CHANNEL = -1002537631509
